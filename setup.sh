@@ -1,59 +1,88 @@
 #!/bin/bash
 
-# Warna dan simbol
-PURPLE='\033[0;35m'
+# Warna & blok visual
 CYAN='\033[0;36m'
+PURPLE='\033[0;35m'
 NC='\033[0m'
 
-# Banner
+progress_bar() {
+  echo -ne "${CYAN}[#####                    ] (20%)\r"; sleep 1
+  echo -ne "[##########              ] (40%)\r"; sleep 1
+  echo -ne "[###############         ] (60%)\r"; sleep 1
+  echo -ne "[####################    ] (80%)\r"; sleep 1
+  echo -ne "[########################] (100%)\r\n"; sleep 0.5
+}
+
 clear
 echo -e "${PURPLE}"
 echo "     ░█▀█░█▀█░█▀▀░░░█▀▀░█░█░▀█▀░█▀█░█▀▀"
 echo "     ░█▀▀░█▀█░█▀▀░░░█░█░█░█░░█░░█░█░▀▀█"
 echo "     ░▀░░░▀░▀░▀▀▀░░░▀▀▀░▀▀▀░▀▀▀░▀░▀░▀▀▀"
-echo -e "${CYAN}         Setup aesGPTbot · by @aesneverhere${NC}"
-echo ""
+echo -e "${CYAN}        Smart Setup for aesGPTbot by @aesneverhere${NC}\n"
 
-# Function: Progress block
-progress_block() {
-  echo -ne "${CYAN}[#####                   ] (25%)\r"
-  sleep 1
-  echo -ne "[##########              ] (50%)\r"
-  sleep 1
-  echo -ne "[###############         ] (75%)\r"
-  sleep 1
-  echo -ne "[#######################] (100%)\r"
-  echo -e "\n${NC}"
-}
+echo -e "${CYAN}🔍 Mendeteksi sistem dan menyesuaikan instalasi...${NC}"
 
-echo -e "${CYAN}🔧 Memulai update & instalasi dependencies...\n"
-progress_block
-
-# APT install (untuk Termux/Ubuntu)
-if command -v apt &> /dev/null; then
-  pkg update -y && pkg upgrade -y &> /dev/null || apt update -y && apt upgrade -y &> /dev/null
-  apt install -y python3 python3-pip git curl &> /dev/null
+# Deteksi OS
+OS=""
+if grep -qE "Android" <<< "$(uname -a)"; then
+    OS="termux"
+elif grep -qi "debian" /etc/os-release 2>/dev/null || grep -qi "ubuntu" /etc/os-release 2>/dev/null; then
+    OS="debian"
+elif [[ "$OSTYPE" == "darwin"* ]]; then
+    OS="mac"
+elif [[ "$REPL_ID" ]]; then
+    OS="replit"
+else
+    OS="unknown"
 fi
 
-# Install pip requirements
-pip install --upgrade pip &> /dev/null
-pip install -r requirements.txt &> /dev/null
+progress_bar
 
-echo -e "${CYAN}📦 Semua dependency berhasil dipasang!\n"
+# Install sistem dependency berdasarkan OS
+echo -e "${CYAN}📦 Menginstal paket sistem (build tools & python)...${NC}"
+case $OS in
+    termux)
+        pkg update -y && pkg upgrade -y > /dev/null
+        pkg install -y python clang libffi openssl curl git rust > /dev/null
+        ;;
+    debian)
+        apt update -y && apt upgrade -y > /dev/null
+        apt install -y python3 python3-pip gcc g++ libffi-dev libssl-dev rustc build-essential git curl > /dev/null
+        ;;
+    mac)
+        echo "🍎 Deteksi macOS. Pastikan Homebrew sudah terpasang!"
+        brew install python rust openssl libffi > /dev/null
+        ;;
+    replit)
+        echo "💻 Replit terdeteksi. Lewati APT."
+        ;;
+    *)
+        echo -e "${CYAN}⚠️ Tidak dapat mendeteksi OS. Lanjut install Python packages saja.${NC}"
+        ;;
+esac
 
-# Input interaktif
+progress_bar
+
+# Install Python packages
+echo -e "${CYAN}📦 Menginstal Python requirements...${NC}"
+python3 -m pip install --upgrade pip > /dev/null
+python3 -m pip install -r requirements.txt > /dev/null
+
+progress_bar
+
+# Isi ENV
 read -p "🤖 BOT_TOKEN Telegram: " BOT_TOKEN
-read -p "🧠 OPENAI_API_KEY (proxy = bebas): " OPENAI_API_KEY
-read -p "🌐 Mode (proxy/openai) [default: proxy]: " MODE
-
+read -p "🧠 OPENAI_API_KEY (bebas untuk mode proxy): " OPENAI_API_KEY
+read -p "🌐 Mode API (proxy/openai) [default: proxy]: " MODE
 MODE=${MODE:-proxy}
 
-# Simpan ke .env
 cat <<EOF > .env
-BOT_TOKEN=${BOT_TOKEN}
-OPENAI_API_KEY=${OPENAI_API_KEY}
-MODE=${MODE}
+BOT_TOKEN=$BOT_TOKEN
+OPENAI_API_KEY=$OPENAI_API_KEY
+MODE=$MODE
 EOF
 
-echo -e "\n✅ ${CYAN}.env berhasil dibuat!"
-echo -e "🚀 Jalankan bot kamu sekarang dengan: ${PURPLE}python main.py${NC}\n"
+progress_bar
+
+echo -e "${CYAN}✅ Setup selesai! File .env berhasil dibuat.${NC}"
+echo -e "${PURPLE}🚀 Jalankan bot dengan: python3 main.py${NC}"
